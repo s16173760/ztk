@@ -45,7 +45,7 @@ pub fn writeInit(allocator: std.mem.Allocator, settings_path: []const u8) !Insta
 
 fn resolveSettingsPath(allocator: std.mem.Allocator, global: bool) ![]u8 {
     if (global) {
-        const home = try compat.getEnvOwned(allocator, "HOME");
+        const home = compat.getEnvOwned(allocator, "HOME") catch return error.HomeNotSet;
         defer allocator.free(home);
         return std.fs.path.join(allocator, &.{ home, gemini.gemini_dir, gemini.settings_filename });
     }
@@ -53,7 +53,10 @@ fn resolveSettingsPath(allocator: std.mem.Allocator, global: bool) ![]u8 {
 }
 
 fn readIfExists(allocator: std.mem.Allocator, path: []const u8) !?[]u8 {
-    const f = compat.openFile(path, .{}) catch return null;
+    const f = compat.openFile(path, .{}) catch |e| switch (e) {
+        error.FileNotFound => return null,
+        else => return e,
+    };
     defer compat.closeFile(f);
     const bytes = try compat.readFileToEndAlloc(f, allocator, 1 << 20);
     return bytes;
